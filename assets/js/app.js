@@ -428,20 +428,24 @@ async function fillTemplateBytes(templatePath, record, map, preloadedBytes) {
     if (!fieldNames.has(pdfField)) { misses++; continue; }
 
     try {
-      const field = form.getField(pdfField);
-      const type  = field.constructor.name;
-      const vNorm = normalize(val);
+const field = form.getField(pdfField);
+const vNorm = normalize(val);
 
-      if (type === "PDFCheckBox") {
-        const shouldCheck = /^(yes|true|1|x)$/i.test(String(val));
-        if (shouldCheck) field.check(); else field.uncheck();
-      } else if (type === "PDFDropdown") {
-        try { field.select(vNorm); } catch { field.setText(vNorm); }
-      } else if (type === "PDFRadioGroup") {
-        try { field.select(vNorm); } catch {}
-      } else if (field.setText) {
-        field.setText(vNorm);
-      }
+const hasCheck   = typeof field.check === "function" && typeof field.uncheck === "function";
+const hasSelect  = typeof field.select === "function";
+const hasSetText = typeof field.setText === "function";
+
+if (hasCheck) {
+  // Treat as checkbox
+  const shouldCheck = /^(yes|true|1|x)$/i.test(String(val));
+  if (shouldCheck) field.check(); else field.uncheck();
+} else if (hasSelect) {
+  // Dropdown or radio group
+  try { field.select(vNorm); } catch { hasSetText && field.setText(vNorm); }
+} else if (hasSetText) {
+  // Text field
+  field.setText(vNorm);
+}
 
       filledFields.add(pdfField);
       hits++;
@@ -463,20 +467,25 @@ async function fillTemplateBytes(templatePath, record, map, preloadedBytes) {
 
     try {
       const type  = field.constructor.name;
-      const vNorm = normalize(rawVal);
+const vNorm = normalize(rawVal);
 
-      if (type === "PDFCheckBox") {
-        const shouldCheck =
-          (typeof rawVal === "boolean" && rawVal) ||
-          /^(yes|true|1|x)$/i.test(String(rawVal));
-        if (shouldCheck) field.check(); else field.uncheck();
-      } else if (type === "PDFDropdown") {
-        try { field.select(vNorm); } catch { field.setText(vNorm); }
-      } else if (type === "PDFRadioGroup") {
-        try { field.select(vNorm); } catch {}
-      } else if (field.setText) {
-        field.setText(vNorm);
-      }
+const hasCheck   = typeof field.check === "function" && typeof field.uncheck === "function";
+const hasSelect  = typeof field.select === "function";
+const hasSetText = typeof field.setText === "function";
+
+if (hasCheck) {
+  // Checkbox – let COB override everything
+  const shouldCheck =
+    (typeof rawVal === "boolean" && rawVal) ||
+    /^(yes|true|1|x)$/i.test(String(rawVal));
+  if (shouldCheck) field.check(); else field.uncheck();
+} else if (hasSelect) {
+  // Dropdown or radio group
+  try { field.select(vNorm); } catch { hasSetText && field.setText(vNorm); }
+} else if (hasSetText) {
+  // Text field
+  field.setText(vNorm);
+}
 
       hits++;
       filledFields.add(name);
