@@ -547,6 +547,29 @@ async function addTemplateToMerge(relPath, record, fieldMap, bucket, preloadedBy
     const rec2 = isCOB
       ? { ...record, ...computeCOB(record) }
       : record;
+    
+    if (isCOB) {
+  console.log("COB DEBUG → rec2 fields:", {
+    Title_Insurance: rec2.Title_Insurance,
+    Appraisal_AVM_Fees: rec2.Appraisal_AVM_Fees,
+
+    // These must exist and be TRUE
+    "Check Box28": rec2["Check Box28"],
+    "Check Box29": rec2["Check Box29"],
+    "Check Box30": rec2["Check Box30"],
+    "Check Box31": rec2["Check Box31"],
+    "Check Box32": rec2["Check Box32"],
+    "Check Box33": rec2["Check Box33"],
+    "Check Box34": rec2["Check Box34"],
+    "Check Box35": rec2["Check Box35"],
+    "Check Box36": rec2["Check Box36"],
+    "Check Box37": rec2["Check Box37"],
+    "Check Box38": rec2["Check Box38"],
+    "Check Box39": rec2["Check Box39"],
+    "Check Box40": rec2["Check Box40"],
+    "Check Box41": rec2["Check Box41"]
+  });
+}
 
     const filled = await fillTemplateBytes(fullPath, rec2, fieldMap, preloadedBytes);
     // WMB and PAD pages remain un-flattened
