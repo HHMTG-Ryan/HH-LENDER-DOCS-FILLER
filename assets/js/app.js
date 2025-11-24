@@ -327,18 +327,21 @@ function computeCOB(record) {
   const termYears = termM / 12;
   const avgPrincipal = (P + Bal) / 2;
 
-  let APR = nomPct;
+  const contract = nomPct;
+  let rawAPR = null;
+
   if (termYears > 0 && avgPrincipal > 0) {
-    const rawAPR = (costOfCredit / (termYears * avgPrincipal)) * 100;
-    APR = rawAPR;
+    rawAPR = (costOfCredit / (termYears * avgPrincipal)) * 100;
   }
 
-  const contract = nomPct;
+  // Floor:
+  // - if no fees: at least contract
+  // - if fees included: at least contract + 0.01
+  let aprFloor = contract;
+  if (totalFees > 0) aprFloor = contract + 0.01;
 
-  // Never below contract rate
-  if (APR < contract) APR = contract;
-  // If there are fees included in APR, ensure APR is strictly above contract
-  if (totalFees > 0 && APR <= contract) APR = contract + 0.01;
+  let APR = rawAPR != null && rawAPR > 0 ? rawAPR : contract;
+  if (APR < aprFloor) APR = aprFloor;
 
   const totalCOB = interestToTerm + totalFees;
 
@@ -402,17 +405,21 @@ async function fillTemplateBytes(templatePath, record, map, preloadedBytes) {
 
     try {
       const field = form.getField(pdfField);
-      const type  = field.constructor.name;
       const vNorm = normalize(val);
 
-      if (type === "PDFCheckBox") {
+      const hasCheck   = typeof field.check === "function" && typeof field.uncheck === "function";
+      const hasSelect  = typeof field.select === "function";
+      const hasSetText = typeof field.setText === "function";
+
+      if (hasCheck) {
+        // Treat as checkbox
         const shouldCheck = /^(yes|true|1|x)$/i.test(String(val));
         if (shouldCheck) field.check(); else field.uncheck();
-      } else if (type === "PDFDropdown") {
-        try { field.select(vNorm); } catch { field.setText(vNorm); }
-      } else if (type === "PDFRadioGroup") {
-        try { field.select(vNorm); } catch {}
-      } else if (field.setText) {
+      } else if (hasSelect) {
+        // Dropdown or radio group
+        try { field.select(vNorm); } catch { hasSetText && field.setText(vNorm); }
+      } else if (hasSetText) {
+        // Text field
         field.setText(vNorm);
       }
 
@@ -435,19 +442,23 @@ async function fillTemplateBytes(templatePath, record, map, preloadedBytes) {
     if (rawVal === undefined || rawVal === null || rawVal === "") continue;
 
     try {
-      const type  = field.constructor.name;
       const vNorm = normalize(rawVal);
 
-      if (type === "PDFCheckBox") {
+      const hasCheck   = typeof field.check === "function" && typeof field.uncheck === "function";
+      const hasSelect  = typeof field.select === "function";
+      const hasSetText = typeof field.setText === "function";
+
+      if (hasCheck) {
+        // Checkbox – let COB override everything
         const shouldCheck =
           (typeof rawVal === "boolean" && rawVal) ||
           /^(yes|true|1|x)$/i.test(String(rawVal));
         if (shouldCheck) field.check(); else field.uncheck();
-      } else if (type === "PDFDropdown") {
-        try { field.select(vNorm); } catch { field.setText(vNorm); }
-      } else if (type === "PDFRadioGroup") {
-        try { field.select(vNorm); } catch {}
-      } else if (field.setText) {
+      } else if (hasSelect) {
+        // Dropdown or radio group
+        try { field.select(vNorm); } catch { hasSetText && field.setText(vNorm); }
+      } else if (hasSetText) {
+        // Text field
         field.setText(vNorm);
       }
 
