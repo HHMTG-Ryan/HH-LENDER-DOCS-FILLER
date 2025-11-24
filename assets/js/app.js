@@ -321,50 +321,23 @@ function computeCOB(record) {
     }
   }
 
-  // ---- APR via IRR ----
-  const CF0 = P - totalFees;
-  const n = N_term;
+  // ---- APR via BC "Cost of Credit / Average Principal" formula ----
+  // Cost of Credit = interest to term + fees included in APR
+  const costOfCredit = interestToTerm + totalFees;
+  const termYears = termM / 12;
+  const avgPrincipal = (P + Bal) / 2;
 
-  function solveAPR() {
-    if (!n || n <= 0) return nomPct;
-
-    let low = 0, high = 1, guess = 0.05;
-
-    const f = (rate) => {
-      let sum = CF0;
-      for (let i = 1; i <= n; i++) {
-        sum -= A / Math.pow(1 + rate, i);
-      }
-      sum -= Bal / Math.pow(1 + rate, n);
-      return sum;
-    };
-
-    // Expand high up if NPV still negative; expand low down if needed
-    while (f(high) < 0) high *= 2;
-    while (f(low) > 0)  low  /= 2;
-
-    // Correct bisection: shrink towards the root
-    for (let i = 0; i < 50; i++) {
-      guess = (low + high) / 2;
-      const val = f(guess);
-      if (Math.abs(val) < 1e-9) break;
-      if (val > 0) {
-        // NPV positive -> rate too low -> move high down
-        high = guess;
-      } else {
-        // NPV negative -> rate too high -> move low up
-        low = guess;
-      }
-    }
-
-    const effAnnual = Math.pow(1 + guess, periodsPerYear) - 1;
-    return effAnnual * 100;
+  let APR = nomPct;
+  if (termYears > 0 && avgPrincipal > 0) {
+    const rawAPR = (costOfCredit / (termYears * avgPrincipal)) * 100;
+    APR = rawAPR;
   }
 
-  let APR = solveAPR();
   const contract = nomPct;
 
+  // Never below contract rate
   if (APR < contract) APR = contract;
+  // If there are fees included in APR, ensure APR is strictly above contract
   if (totalFees > 0 && APR <= contract) APR = contract + 0.01;
 
   const totalCOB = interestToTerm + totalFees;
@@ -428,24 +401,20 @@ async function fillTemplateBytes(templatePath, record, map, preloadedBytes) {
     if (!fieldNames.has(pdfField)) { misses++; continue; }
 
     try {
-const field = form.getField(pdfField);
-const vNorm = normalize(val);
+      const field = form.getField(pdfField);
+      const type  = field.constructor.name;
+      const vNorm = normalize(val);
 
-const hasCheck   = typeof field.check === "function" && typeof field.uncheck === "function";
-const hasSelect  = typeof field.select === "function";
-const hasSetText = typeof field.setText === "function";
-
-if (hasCheck) {
-  // Treat as checkbox
-  const shouldCheck = /^(yes|true|1|x)$/i.test(String(val));
-  if (shouldCheck) field.check(); else field.uncheck();
-} else if (hasSelect) {
-  // Dropdown or radio group
-  try { field.select(vNorm); } catch { hasSetText && field.setText(vNorm); }
-} else if (hasSetText) {
-  // Text field
-  field.setText(vNorm);
-}
+      if (type === "PDFCheckBox") {
+        const shouldCheck = /^(yes|true|1|x)$/i.test(String(val));
+        if (shouldCheck) field.check(); else field.uncheck();
+      } else if (type === "PDFDropdown") {
+        try { field.select(vNorm); } catch { field.setText(vNorm); }
+      } else if (type === "PDFRadioGroup") {
+        try { field.select(vNorm); } catch {}
+      } else if (field.setText) {
+        field.setText(vNorm);
+      }
 
       filledFields.add(pdfField);
       hits++;
@@ -467,25 +436,20 @@ if (hasCheck) {
 
     try {
       const type  = field.constructor.name;
-const vNorm = normalize(rawVal);
+      const vNorm = normalize(rawVal);
 
-const hasCheck   = typeof field.check === "function" && typeof field.uncheck === "function";
-const hasSelect  = typeof field.select === "function";
-const hasSetText = typeof field.setText === "function";
-
-if (hasCheck) {
-  // Checkbox – let COB override everything
-  const shouldCheck =
-    (typeof rawVal === "boolean" && rawVal) ||
-    /^(yes|true|1|x)$/i.test(String(rawVal));
-  if (shouldCheck) field.check(); else field.uncheck();
-} else if (hasSelect) {
-  // Dropdown or radio group
-  try { field.select(vNorm); } catch { hasSetText && field.setText(vNorm); }
-} else if (hasSetText) {
-  // Text field
-  field.setText(vNorm);
-}
+      if (type === "PDFCheckBox") {
+        const shouldCheck =
+          (typeof rawVal === "boolean" && rawVal) ||
+          /^(yes|true|1|x)$/i.test(String(rawVal));
+        if (shouldCheck) field.check(); else field.uncheck();
+      } else if (type === "PDFDropdown") {
+        try { field.select(vNorm); } catch { field.setText(vNorm); }
+      } else if (type === "PDFRadioGroup") {
+        try { field.select(vNorm); } catch {}
+      } else if (field.setText) {
+        field.setText(vNorm);
+      }
 
       hits++;
       filledFields.add(name);
@@ -556,29 +520,6 @@ async function addTemplateToMerge(relPath, record, fieldMap, bucket, preloadedBy
     const rec2 = isCOB
       ? { ...record, ...computeCOB(record) }
       : record;
-    
-    if (isCOB) {
-  console.log("COB DEBUG → rec2 fields:", {
-    Title_Insurance: rec2.Title_Insurance,
-    Appraisal_AVM_Fees: rec2.Appraisal_AVM_Fees,
-
-    // These must exist and be TRUE
-    "Check Box28": rec2["Check Box28"],
-    "Check Box29": rec2["Check Box29"],
-    "Check Box30": rec2["Check Box30"],
-    "Check Box31": rec2["Check Box31"],
-    "Check Box32": rec2["Check Box32"],
-    "Check Box33": rec2["Check Box33"],
-    "Check Box34": rec2["Check Box34"],
-    "Check Box35": rec2["Check Box35"],
-    "Check Box36": rec2["Check Box36"],
-    "Check Box37": rec2["Check Box37"],
-    "Check Box38": rec2["Check Box38"],
-    "Check Box39": rec2["Check Box39"],
-    "Check Box40": rec2["Check Box40"],
-    "Check Box41": rec2["Check Box41"]
-  });
-}
 
     const filled = await fillTemplateBytes(fullPath, rec2, fieldMap, preloadedBytes);
     // WMB and PAD pages remain un-flattened
@@ -719,7 +660,7 @@ async function makeInfoCoverPdf(record, mapDefault) {
   // Manifest (safe defaults/guards)
   const manifest = await fetchJson(`${CONFIG_BASE}standard_pkg.json`);
   const sequence = Array.isArray(manifest.sequence) ? manifest.sequence : [];
-  const prosprFallback = manifest.prospr_fallback || "PROSPR.pdf";
+  const prosprFallback = manifest.prospr_fallback || "Prospr_Template.pdf";
 
   // Map (normalized above); also allow local override for Singles
   let fieldMap = {};
