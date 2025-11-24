@@ -339,14 +339,22 @@ function computeCOB(record) {
       return sum;
     };
 
+    // Expand high up if NPV still negative; expand low down if needed
     while (f(high) < 0) high *= 2;
     while (f(low) > 0)  low  /= 2;
 
+    // Correct bisection: shrink towards the root
     for (let i = 0; i < 50; i++) {
       guess = (low + high) / 2;
       const val = f(guess);
       if (Math.abs(val) < 1e-9) break;
-      if (val > 0) low = guess; else high = guess;
+      if (val > 0) {
+        // NPV positive -> rate too low -> move high down
+        high = guess;
+      } else {
+        // NPV negative -> rate too high -> move low up
+        low = guess;
+      }
     }
 
     const effAnnual = Math.pow(1 + guess, periodsPerYear) - 1;
@@ -533,7 +541,7 @@ async function addTemplateToMerge(relPath, record, fieldMap, bucket, preloadedBy
   const fullPath = `${TEMPL_BASE}${relPath}`;
   const isCOB = /COB/i.test(relPath);
   const isWMB = /WMB/i.test(relPath) && !/Header/i.test(relPath);
-  const isPAD = /PAD/i.test(relPath); // NEW: detect PAD templates
+  const isPAD = /PAD/i.test(relPath); // PAD templates stay editable
 
   try {
     const rec2 = isCOB
