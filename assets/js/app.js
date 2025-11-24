@@ -533,6 +533,7 @@ async function addTemplateToMerge(relPath, record, fieldMap, bucket, preloadedBy
   const fullPath = `${TEMPL_BASE}${relPath}`;
   const isCOB = /COB/i.test(relPath);
   const isWMB = /WMB/i.test(relPath) && !/Header/i.test(relPath);
+  const isPAD = /PAD/i.test(relPath); // NEW: detect PAD templates
 
   try {
     const rec2 = isCOB
@@ -540,11 +541,13 @@ async function addTemplateToMerge(relPath, record, fieldMap, bucket, preloadedBy
       : record;
 
     const filled = await fillTemplateBytes(fullPath, rec2, fieldMap, preloadedBytes);
-    bucket.push({ bytes: filled, noFlatten: isWMB });
+    // WMB and PAD pages remain un-flattened
+    bucket.push({ bytes: filled, noFlatten: isWMB || isPAD });
   } catch (err) {
     dwarn(`Could not fill ${relPath}, using static version instead: ${err.message}`);
     const bytes = preloadedBytes || await fetchPdfBytes(fullPath);
-    bucket.push({ bytes, noFlatten: isWMB });
+    // WMB and PAD pages remain un-flattened even if we fall back to static
+    bucket.push({ bytes, noFlatten: isWMB || isPAD });
   }
 }
 
