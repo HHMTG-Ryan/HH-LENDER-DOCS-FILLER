@@ -85,20 +85,6 @@ function tryJSON(t) {
     return null;
   }
 }
-function readFromQuery() {
-  try {
-    const p = new URLSearchParams(location.search);
-    let raw = p.get("data");
-    if (!raw) return null;
-    raw = decodeURIComponent(raw.trim());
-    const decoded = atob(b64urlToB64(raw));
-    const parsed = tryJSON(decoded);
-    if (!parsed) throw new Error("Payload invalid or truncated—relaunch from CRM.");
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 function readFromWindowName() {
   try {
     if (!window.name) return null;
@@ -658,7 +644,15 @@ async function makeInfoCoverPdf(record, mapDefault) {
   }
 
   setStatus("Loading payload...");
-  let record = readFromQuery() || readFromWindowName();
+
+  // Prefer window.name transport; no ?data query
+  let record = readFromWindowName();
+
+  // Clear window.name ASAP for security (whether parse worked or not)
+  if (window.name) {
+    window.name = "";
+  }
+
   if (!record && els.manualJson?.value?.trim()) {
     record = tryJSON(els.manualJson.value.trim());
   }
