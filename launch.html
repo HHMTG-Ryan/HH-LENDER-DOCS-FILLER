@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Launching HH PDF Filler…</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    html,body{
+      height:100%;
+      margin:0;
+      background:#0b1220;
+      color:#e5e7eb;
+      font:14px system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    }
+    .wrap{
+      height:100%;
+      display:grid;
+      place-items:center;
+    }
+    .card{
+      max-width:560px;
+      padding:24px;
+      border-radius:16px;
+      border:1px solid #1f2937;
+      background:#0f172a;
+      text-align:center;
+    }
+    h1{
+      margin:0 0 6px;
+      font-size:18px;
+    }
+    p{
+      margin:8px 0 0;
+      color:#9ca3af;
+      font-size:13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Launching HH PDF Filler…</h1>
+      <p>Your document builder will open in a moment.</p>
+      <p>If nothing happens, enable pop-ups for this site and try again.</p>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var raw = params.get("data");
+
+        if (!raw) {
+          document.querySelector(".card").innerHTML =
+            "<h1>Launch Error</h1><p>Missing payload (&quot;data&quot; parameter).</p>";
+          return;
+        }
+
+        // Pass the base64 payload forward via window.name
+        // (app.js will decode + parse it)
+        window.name = raw;
+
+        // Optionally clean up the URL so the query isn't visible if user navigates back here
+        history.replaceState({}, "", window.location.pathname);
+
+        // Now go to the main app (NO ?data here)
+        window.location.href = "https://hhmtg-ryan.github.io/HH-LENDER-DOCS-FILLER/";
+      } catch (e) {
+        console.error(e);
+        var card = document.querySelector(".card");
+        if (card) {
+          card.innerHTML =
+            "<h1>Launch Error</h1><p>" + String(e) + "</p>";
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
